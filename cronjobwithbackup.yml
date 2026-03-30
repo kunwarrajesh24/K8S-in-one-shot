@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-cronjob
+spec:
+  schedule: "* * * * *"   # Every 1 minute
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup-container
+            image: busybox
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting backup..."
+              mkdir -p /backup
+              echo "Backup at $(date)" > /backup/backup.txt
+              echo "Backup completed"
+          restartPolicy: OnFailure
