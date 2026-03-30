@@ -1,0 +1,34 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: s3-backup-cronjob
+spec:
+  schedule: "* * * * *"   # runs every minute
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: s3-backup
+            image: amazon/aws-cli
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: AWS_SECRET_ACCESS_KEY
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Creating backup..."
+              date > /tmp/backup.txt
+              echo "Uploading to S3..."
+              aws s3 cp /tmp/backup.txt s3://your-bucket-name/backup-$(date +%s).txt
+              echo "Done"
+          restartPolicy: OnFailure
