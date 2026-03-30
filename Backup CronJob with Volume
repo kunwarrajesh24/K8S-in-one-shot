@@ -1,0 +1,64 @@
+# 🔹 Persistent Volume
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: backup-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""   # ❗ Disable dynamic provisioning
+  hostPath:
+    path: /mnt/data/backup
+    type: DirectoryOrCreate
+
+---
+# 🔹 Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backup-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""   # ❗ Must match PV
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# 🔹 CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-cronjob
+spec:
+  schedule: "* * * * *"   # Every 1 minute
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 60
+      template:
+        spec:
+          containers:
+          - name: backup-container
+            image: busybox
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting backup..."
+              mkdir -p /backup
+              echo "Backup at $(date)" >> /backup/backup.txt
+              ls -l /backup
+              echo "Backup completed"
+            volumeMounts:
+            - name: backup-volume
+              mountPath: /backup
+          restartPolicy: OnFailure
+          volumes:
+          - name: backup-volume
+            persistentVolumeClaim:
+              claimName: backup-pvc
