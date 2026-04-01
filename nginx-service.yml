@@ -5,7 +5,7 @@ metadata:
   namespace: nginx
 spec:
   selector:
-    run: nginx   # ✅ FIXED
+    run: nginx  
   ports:
     - port: 80
       targetPort: 80
