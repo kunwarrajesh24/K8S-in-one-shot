@@ -2,6 +2,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: my-cronjob
+  namespace: nginx
 spec:
   schedule: "*/1 * * * *"   # every 1 minute
   jobTemplate:
