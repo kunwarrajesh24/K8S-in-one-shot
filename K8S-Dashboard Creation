@@ -1,0 +1,138 @@
+Practical: Kubernetes Cluster Setup Using KIND
+
+1. Understand KIND architecture.
+2. Install KIND and kubectl.
+3. Create a multi-node Kubernetes cluster.
+4. Configure one Control Plane and three Worker Nodes.
+5. Interact with the cluster using kubectl.
+6. Deploy Kubernetes Dashboard.
+7. Configure a ServiceAccount and RBAC.
+8. Generate an authentication token.
+9. Access the Kubernetes Dashboard through a browser.
+10. Delete the Kubernetes cluster.
+
+## Installing KIND, kubectl, and Docker
+##Installing Docker 
+sudo apt install docker.io -y
+sudo usermod -aG docker $USER && newgrp docker
+docker ps
+docker images
+
+Step 1: Download the installation script
+wget https://raw.githubusercontent.com/LondheShubham153/kubestarter/main/kind-cluster/install.sh
+
+## Understand the command
+Part	Meaning
+wget - Linux utility used to download files.
+https://	- Secure web protocol.
+raw.githubusercontent.com	Provides the raw file content from GitHub.
+install.sh	- Installation shell script.
+
+
+Step 2: Verify the downloaded file
+ls -l install.sh
+
+Step 3: Inspect the script
+Before executing an installation script, inspect its contents:
+cat install.sh
+
+Step 4: Give execution permission
+chmod +x install.sh
+
+Step 5: Execute the script
+./install.sh
+
+Step 6: Verify installations
+kind version
+kubectl version --client
+docker --version
+
+## Creating the KIND Cluster
+nano config.yaml
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.35.1
+
+  - role: worker
+    image: kindest/node:v1.35.1
+
+  - role: worker
+    image: kindest/node:v1.35.1
+
+  - role: worker
+    image: kindest/node:v1.35.1
+
+## Create the cluster
+kind create cluster --config config.yaml --name my-cluster
+docker ps
+kubectl get nodes
+kubectl cluster-info
+kubectl get pods -A
+kubectl get namespaces
+kubectl get deployments -A
+kubectl get services -A
+
+## Installing Kubernetes Dashboard
+## Deploy Dashboard
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+
+## Verify Dashboard Pods
+kubectl get pods -n kubernetes-dashboard
+kubectl get svc -n kubernetes-dashboard
+
+## Creating Dashboard Admin User
+nano dashboard-admin-user.yml
+
+file:
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kubernetes-dashboard
+
+## Apply the configuration
+kubectl apply -f dashboard-admin-user.yml
+
+## Verify ServiceAccount
+kubectl get serviceaccount -n kubernetes-dashboard
+
+## Generate the authentication token
+kubectl -n kubernetes-dashboard create token admin-user
+
+This generates a bearer token.
+Copy it securely.
+
+## Accessing Kubernetes Dashboard
+Now access the Dashboard through the browser.
+## Start kubectl proxy
+kubectl proxy --address=127.0.0.1 --port=8001
+
+## Open Dashboard
+http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+
+## Open a second PowerShell window on Windows:
+ssh -i "C:\Users\Dell\Downloads\iot-project-key.pem" -L 8001:127.0.0.1:8001 ubuntu@YOUR_EC2_PUBLIC_IP
+
+## Deleting the KIND Cluster
+kind delete cluster --name my-cluster
+
+##Verify
+kind get clusters
