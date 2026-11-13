@@ -21,3 +21,34 @@ spec:
         image: nginx:latest
         ports:
         - containerPort: 80
+
+
+### Updated file
+
+apiVersion: apps/v1
+kind: ReplicaSet
+
+metadata:
+  name: nginx-replicasets
+  namespace: nginx
+  labels:
+    app: nginx-rs
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: nginx-rs
+
+  template:
+    metadata:
+      labels:
+        app: nginx-rs
+
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
