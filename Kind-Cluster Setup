@@ -1,7 +1,11 @@
 # KIND Cluster Setup Guide
 
 ## 1. Installing KIND and kubectl
-Install KIND and kubectl using the provided [script](https://github.com/LondheShubham153/kubestarter/blob/main/kind-cluster/install.sh):
+wget https://raw.githubusercontent.com/LondheShubham153/kubestarter/main/kind-cluster/install.sh
+ls -l install.sh
+chmod +x install.sh
+./install.sh
+
 
 ## 2. Setting Up the KIND Cluster
 Create a config.yaml file:
@@ -36,12 +40,15 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/a
 
 ## Create an Admin User
 ## Create a dashboard-admin-user.yml file with the following content:
+nano dashboard-admin-user.yml
 
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: admin-user
   namespace: kubernetes-dashboard
+
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -58,7 +65,10 @@ subjects:
 ## Apply the configuration:
 kubectl apply -f dashboard-admin-user.yml
 
-## Get the Access Token
+##Verify ServiceAccount
+kubectl get serviceaccount -n kubernetes-dashboard
+
+## Generate the Dashboard Token
 Retrieve the token for the admin-user
 kubectl -n kubernetes-dashboard create token admin-user
 
@@ -67,6 +77,8 @@ kubectl -n kubernetes-dashboard create token admin-user
 ## Access the Dashboard
 ## Start the Dashboard using kubectl proxy:
 kubectl proxy
+
+Keep this terminal running.
 
 ## Open the Dashboard in your browser:
 http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
