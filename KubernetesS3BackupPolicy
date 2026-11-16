@@ -2,10 +2,12 @@
     "Version": "2012-10-17",
     "Statement": [
         {
+            "Sid": "AllowKubernetesS3Backup",
             "Effect": "Allow",
-            "Action": [
-                "s3:PutObject"
-            ],
+            "Principal": {
+                "AWS": "arn:aws:iam::966042699177:user/kunwar"
+            },
+            "Action": "s3:PutObject",
             "Resource": "arn:aws:s3:::k8s-bucket-hello/*"
         }
     ]
