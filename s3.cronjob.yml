@@ -32,3 +32,57 @@ spec:
               aws s3 cp /tmp/backup.txt s3://your-bucket-name/backup-$(date +%s).txt
               echo "Done"
           restartPolicy: OnFailure
+
+
+##Another file with Namespace
+
+          apiVersion: batch/v1
+kind: CronJob
+
+metadata:
+  name: s3-backup-cronjob
+  namespace: nginx
+
+spec:
+  schedule: "* * * * *"
+
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: s3-backup
+            image: amazon/aws-cli:2
+
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: AWS_ACCESS_KEY_ID
+
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: AWS_SECRET_ACCESS_KEY
+
+            - name: AWS_DEFAULT_REGION
+              value: ap-south-1
+
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+
+              echo "Creating backup..."
+              date > /tmp/backup.txt
+
+              echo "Uploading to S3..."
+
+              aws s3 cp /tmp/backup.txt s3://k8s-bucket-hello/backup-$(date +%s).txt
+
+              echo "Backup uploaded successfully!"
+
+          restartPolicy: OnFailure
