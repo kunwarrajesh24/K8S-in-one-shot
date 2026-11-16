@@ -5,10 +5,13 @@ wget https://raw.githubusercontent.com/LondheShubham153/kubestarter/main/kind-cl
 ls -l install.sh
 chmod +x install.sh
 ./install.sh
+sudo usermod -aG docker $USER && newgrp docker
 
 
 ## 2. Setting Up the KIND Cluster
 Create a config.yaml file:
+
+nano config.yml
 
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
