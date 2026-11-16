@@ -1,0 +1,352 @@
+# Practical: Kubernetes CronJob – Automated Backup to Amazon S3
+##Practical Title: Automating Backup to AWS S3 Using Kubernetes CronJob and Kubernetes Secrets
+##Objective: Create a Kubernetes CronJob that automatically generates a backup file and uploads it to an Amazon S3 bucket using AWS IAM credentials stored securely in a Kubernetes Secret.
+
+## 1. Understand the Architecture
+First, understand what we are going to build.
+### How does it work?
+1. Kubernetes CronJob triggers at a scheduled time.
+2. CronJob creates a Kubernetes Job.
+3. Job creates a Pod.
+4. Pod runs an AWS CLI container.
+5. Container generates a backup file.
+6. Container retrieves AWS credentials from Kubernetes Secret.
+7. AWS IAM verifies permissions.
+8. AWS S3 receives the backup file.
+
+# PART 1: AWS Configuration
+
+## Step 1. Create an S3 Bucket
+AWS → S3 → Create bucket
+Bucket Name - k8s-bucket(Any random Name)
+
+## Step 2. Create IAM Permissions
+AWS → IAM → Users → kunwar → Permissions
+User name - Kunwar
+Go to Permissions - Attach Policies - AmazonS3FullAccess
+
+For this practical, we will use a dedicated least-privilege policy instead of granting full S3 access.
+Click:
+Add permissions → Create inline policy → JSON.
+
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowKubernetesS3Backup",
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject"
+            ],
+            "Resource": "arn:aws:s3:::k8s-bucket-hello/*"
+        }
+    ]
+}
+
+Policy name:
+KubernetesS3BackupPolicy
+
+or 
+
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "AllowKubernetesS3Backup",
+			"Effect": "Allow",
+			"Principal": {
+				"AWS": "arn:aws:iam::966042699177:user/kunwar"
+			},
+			"Action": "s3:PutObject",
+			"Resource": "arn:aws:s3:::k8s-bucket-hello/*"
+		}
+	]
+}
+
+Click Create policy.
+
+## Step 3. Create AWS Access Keys
+Navigate to:
+IAM → Users → kunwar → Security credentials.
+Under Access keys, create an access key.
+
+Select the appropriate use case and generate:
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+
+# PART 2: Kubernetes Configuration
+## Step 4. Verify Kubernetes Cluster
+kubectl get nodes
+
+Check:
+kubectl get pods -A
+
+Verify that your Kubernetes cluster is working.
+
+## Step 5. Create Kubernetes Secret
+
+Now we will store AWS credentials inside Kubernetes.
+Why?
+We should not hardcode AWS credentials inside Dockerfiles or application source code.
+
+Create a Secret:
+
+kubectl create secret generic aws-secret --from-literal=AWS_ACCESS_KEY_ID='YOUR_NEW_ACCESS_KEY' --from-literal=AWS_SECRET_ACCESS_KEY='YOUR_NEW_SECRET_KEY'
+Remember:
+
+- Use two normal hyphens before `from-literal`.
+- Do not put spaces inside the quotation marks.
+- Use lowercase and hyphens in the Secret name.
+
+Verify:
+kubectl get secrets
+Expected:
+NAME         TYPE     DATA
+aws-secret   Opaque   2
+
+Describe:
+kubectl describe secret aws-secret
+
+Expected:
+
+Name:         aws-secret
+Namespace:    default
+Type:         Opaque
+
+Data
+AWS_ACCESS_KEY_ID:      20 bytes
+AWS_SECRET_ACCESS_KEY:  40 bytes
+
+The byte counts depend on your credentials.
+# PART 3: Create Kubernetes CronJob
+
+Now comes the main practical.
+
+We will create a CronJob that automatically generates a backup and uploads it to S3.
+
+## Step 6. Create CronJob YAML File
+Execute:
+nano s3-backup-cronjob.yaml
+Paste the following YAML:
+
+apiVersion: batch/v1
+kind: CronJob
+
+metadata:
+  name: s3-backup-cronjob
+
+spec:
+  schedule: "*/5 * * * *"
+
+  concurrencyPolicy: Forbid
+
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+
+      template:
+        metadata:
+          labels:
+            app: s3-backup
+
+        spec:
+          restartPolicy: Never
+
+          containers:
+            - name: s3-backup-container
+
+              image: amazon/aws-cli:2
+
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+
+                  echo "Creating backup..."
+
+                  mkdir -p /tmp
+
+                  echo "Kubernetes backup created at $(date)" > /tmp/backup.txt
+
+                  echo "Checking AWS identity..."
+
+                  aws sts get-caller-identity
+
+                  echo "Uploading to S3..."
+
+                  aws s3 cp /tmp/backup.txt \
+                    "s3://${S3_BUCKET}/backup-$(date +%s).txt"
+
+                  echo "Backup uploaded successfully!"
+
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: aws-secret
+                      key: AWS_ACCESS_KEY_ID
+
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: aws-secret
+                      key: AWS_SECRET_ACCESS_KEY
+
+                - name: AWS_DEFAULT_REGION
+                  value: ap-south-1
+
+                - name: S3_BUCKET
+                  value: k8s-bucket-hello
+
+# PART 4: Deploy CronJob
+## Step 7. Apply YAML File
+
+Execute:
+kubectl apply -f s3-backup-cronjob.yaml
+
+Expected:
+cronjob.batch/s3-backup-cronjob created
+
+## Step 8. Verify CronJob
+kubectl get cronjobs
+
+Expected:
+NAME                SCHEDULE      SUSPEND   ACTIVE
+s3-backup-cronjob    */5 * * * *   False     0
+
+## Step 9. Check Jobs
+kubectl get jobs
+
+A new Job should appear after the next scheduled execution.
+
+## Step 10. Check Pods
+kubectl get pods
+
+You might see:
+NAME                               READY   STATUS
+s3-backup-cronjob-xxxxx-xxxxx      0/1     Completed
+Remember:
+
+- Running = Task is executing.
+- Completed = Task finished successfully.
+- Error = Task failed.
+
+For this practical, `Completed` is expected.
+
+# PART 5: Verify Backup Upload
+
+## Step 11. Check Pod Logs
+
+First:
+kubectl get pods
+
+Copy the latest Pod name.
+Then:
+kubectl logs <POD_NAME>
+Expected successful output:
+Creating backup...
+
+Checking AWS identity...
+
+{
+    "UserId": "XXXXXXXX",
+    "Account": "966042699177",
+    "Arn": "arn:aws:iam::966042699177:user/kunwar"
+}
+
+Uploading to S3...
+
+upload: ../tmp/backup.txt to s3://k8s-bucket-hello/backup-XXXXXXXXXX.txt
+Backup uploaded successfully!
+
+The exact output and file path may vary.
+
+The important line is:
+Backup uploaded successfully!
+## Step 12. Verify in AWS S3
+
+Open AWS Console.
+Navigate to:
+S3 → Buckets → k8s-bucket-hello.
+
+You should see files similar to:
+backup-1794818161.txt
+backup-1794818461.txt
+backup-1794818761.txt
+Congratulations!
+
+# PART 6: Execute CronJob Manually
+Execute:
+kubectl create job manual-backup-test --from=cronjob/s3-backup-cronjob
+
+Expected:
+job.batch/manual-backup-test created
+
+Check:
+kubectl get jobs
+
+Check Pods:
+kubectl get pods
+
+Check logs:
+kubectl logs job/manual-backup-test
+
+# PART 7: Troubleshooting
+Check the identity from the logs:
+kubectl logs <POD_NAME>
+
+Look for:
+arn:aws:iam::966042699177:user/kunwar
+
+# PART 8: Cleanup
+After completing the practical, you can remove the Kubernetes resources.
+
+Delete CronJob:
+kubectl delete cronjob s3-backup-cronjob
+
+Delete manual Job:
+kubectl delete job manual-backup-test
+
+Delete Secret:
+kubectl delete secret aws-secret
+
+Verify:
+kubectl get all
+kubectl get secrets
+The complete workflow:
+
+             KUBERNETES CLUSTER
+                     |
+                     |
+                CRONJOB
+                     |
+                     |
+                   JOB
+                     |
+                     |
+                   POD
+                     |
+                     |
+              AWS CLI CONTAINER
+                     |
+             ------------------
+             |                |
+       Kubernetes Secret   Backup Script
+             |                |
+       AWS Credentials    backup.txt
+             |                |
+             ------------------
+                     |
+                     |
+                 AWS IAM
+                     |
+              Permission Check
+                     |
+                     |
+                AMAZON S3
+                     |
+                     |
+             BACKUP SUCCESSFUL
