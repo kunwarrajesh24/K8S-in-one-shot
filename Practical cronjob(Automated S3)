@@ -39,7 +39,7 @@ Add permissions → Create inline policy → JSON.
             "Action": [
                 "s3:PutObject"
             ],
-            "Resource": "arn:aws:s3:::k8s-bucket-hello/*"
+            "Resource": "arn:aws:s3:::<OUR-BUCKET-NAME/*"
         }
     ]
 }
@@ -56,10 +56,10 @@ or
 			"Sid": "AllowKubernetesS3Backup",
 			"Effect": "Allow",
 			"Principal": {
-				"AWS": "arn:aws:iam::966042699177:user/kunwar"
+				"AWS": "arn:aws:iam::966042699177:user/<IAM USER NAME>"
 			},
 			"Action": "s3:PutObject",
-			"Resource": "arn:aws:s3:::k8s-bucket-hello/*"
+			"Resource": "arn:aws:s3:::<OUR-BUCKET-NAME/*"
 		}
 	]
 }
@@ -128,6 +128,7 @@ We will create a CronJob that automatically generates a backup and uploads it to
 ## Step 6. Create CronJob YAML File
 Execute:
 nano s3-backup-cronjob.yaml
+
 Paste the following YAML:
 
 apiVersion: batch/v1
@@ -146,7 +147,7 @@ spec:
         spec:
           containers:
           - name: s3-backup
-            image: amazon/aws-cli:2
+            image: amazon/aws-cli:latest
 
             env:
             - name: AWS_ACCESS_KEY_ID
@@ -175,7 +176,7 @@ spec:
 
               echo "Uploading to S3..."
 
-              aws s3 cp /tmp/backup.txt s3://k8s-bucket-hello/backup-$(date +%s).txt
+              aws s3 cp /tmp/backup.txt s3://<OUR-BUCKET-NAME>/backup-$(date +%s).txt
 
               echo "Backup uploaded successfully!"
 
