@@ -79,6 +79,7 @@ kubectl -n kubernetes-dashboard create token admin-user
 kubectl proxy
 
 Keep this terminal running.
+ssh -i "C:\Users\Dell\Downloads\iot-project-key.pem" -L 8001:127.0.0.1:8001 ubuntu@13.233.158.117
 
 ## Open the Dashboard in your browser:
 http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
