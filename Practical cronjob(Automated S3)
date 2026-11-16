@@ -133,97 +133,77 @@ kind: CronJob
 
 metadata:
   name: s3-backup-cronjob
+  namespace: nginx
 
 spec:
-  schedule: "*/5 * * * *"
-
-  concurrencyPolicy: Forbid
-
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
+  schedule: "* * * * *"
 
   jobTemplate:
     spec:
-      backoffLimit: 1
-
       template:
-        metadata:
-          labels:
-            app: s3-backup
-
         spec:
-          restartPolicy: Never
-
           containers:
-            - name: s3-backup-container
+          - name: s3-backup
+            image: amazon/aws-cli:2
 
-              image: amazon/aws-cli:2
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: AWS_ACCESS_KEY_ID
 
-              command:
-                - /bin/sh
-                - -c
-                - |
-                  set -eu
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-secret
+                  key: AWS_SECRET_ACCESS_KEY
 
-                  echo "Creating backup..."
+            - name: AWS_DEFAULT_REGION
+              value: ap-south-1
 
-                  mkdir -p /tmp
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
 
-                  echo "Kubernetes backup created at $(date)" > /tmp/backup.txt
+              echo "Creating backup..."
+              date > /tmp/backup.txt
 
-                  echo "Checking AWS identity..."
+              echo "Uploading to S3..."
 
-                  aws sts get-caller-identity
+              aws s3 cp /tmp/backup.txt s3://k8s-bucket-hello/backup-$(date +%s).txt
 
-                  echo "Uploading to S3..."
+              echo "Backup uploaded successfully!"
 
-                  aws s3 cp /tmp/backup.txt \
-                    "s3://${S3_BUCKET}/backup-$(date +%s).txt"
+          restartPolicy: OnFailure
 
-                  echo "Backup uploaded successfully!"
-
-              env:
-                - name: AWS_ACCESS_KEY_ID
-                  valueFrom:
-                    secretKeyRef:
-                      name: aws-secret
-                      key: AWS_ACCESS_KEY_ID
-
-                - name: AWS_SECRET_ACCESS_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: aws-secret
-                      key: AWS_SECRET_ACCESS_KEY
-
-                - name: AWS_DEFAULT_REGION
-                  value: ap-south-1
-
-                - name: S3_BUCKET
-                  value: k8s-bucket-hello
 
 # PART 4: Deploy CronJob
 ## Step 7. Apply YAML File
 
 Execute:
 kubectl apply -f s3-backup-cronjob.yaml
+kubectl get cronjobs -n nginx
 
 Expected:
 cronjob.batch/s3-backup-cronjob created
 
 ## Step 8. Verify CronJob
-kubectl get cronjobs
+kubectl get cronjobs -n nginx
 
 Expected:
 NAME                SCHEDULE      SUSPEND   ACTIVE
 s3-backup-cronjob    */5 * * * *   False     0
 
 ## Step 9. Check Jobs
-kubectl get jobs
+kubectl get jobs -n nginx
 
 A new Job should appear after the next scheduled execution.
 
 ## Step 10. Check Pods
-kubectl get pods
+kubectl get pods -n nginx
 
 You might see:
 NAME                               READY   STATUS
@@ -241,7 +221,7 @@ For this practical, `Completed` is expected.
 ## Step 11. Check Pod Logs
 
 First:
-kubectl get pods
+kubectl get pods -n nginx
 
 Copy the latest Pod name.
 Then:
